@@ -3,20 +3,21 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/minya/domofone/lib"
-	"github.com/minya/goutils/config"
-	"github.com/minya/goutils/web"
-	"github.com/minya/telegram"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/minya/domofone/lib"
+	"github.com/minya/goutils/config"
+	"github.com/minya/goutils/web"
+	"github.com/minya/telegram"
 )
 
 var settings BotSettings
 
-func Handle(w http.ResponseWriter, r *http.Request) {
+func handle(w http.ResponseWriter, r *http.Request) {
 	bytes, _ := ioutil.ReadAll(r.Body)
 	var upd telegram.Update
 	json.Unmarshal(bytes, &upd)
@@ -25,10 +26,10 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	var userInfo UserInfo
 	userInfoErr := config.UnmarshalJson(
-		&userInfo, fmt.Sprintf(".domofoneBot/users/%v.json", userName))
+		&userInfo, fmt.Sprintf("~/.domofoneBot/users/%v.json", userName))
 	if nil != userInfoErr {
 		fmt.Printf("error: %v\n", userInfoErr)
-		SendMessage(upd.Message.Chat.Id, "Not registered")
+		sendMessage(upd.Message.Chat.Id, "Not registered")
 		return
 	}
 
@@ -37,18 +38,18 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	bal, fare, err := lib.GetDomofoneBalance(userInfo.Login, userInfo.Password)
 	if nil != err {
 		fmt.Printf("error: %v\n", err)
-		SendMessage(upd.Message.Chat.Id, "Unable to get balance")
+		sendMessage(upd.Message.Chat.Id, "Unable to get balance")
 		return
 	}
 
-	SendMessage(
+	sendMessage(
 		upd.Message.Chat.Id,
 		fmt.Sprintf("Balance: %v, Price: %v", bal, fare))
 
 	io.WriteString(w, "ok")
 }
 
-func SendMessage(chatId int, msg string) {
+func sendMessage(chatId int, msg string) {
 	client := http.Client{
 		Transport: web.DefaultTransport(1000),
 	}
@@ -69,8 +70,8 @@ func SendMessage(chatId int, msg string) {
 }
 
 func main() {
-	config.UnmarshalJson(&settings, ".domofoneBot/settings.json")
-	http.HandleFunc("/", Handle)
+	config.UnmarshalJson(&settings, "~/.domofoneBot/settings.json")
+	http.HandleFunc("/", handle)
 	http.ListenAndServe(":8080", nil)
 }
 
