@@ -2,11 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 
 	"github.com/minya/domofone/lib"
@@ -16,6 +19,18 @@ import (
 )
 
 var settings BotSettings
+
+var logPath string
+var port int
+
+func init() {
+	const (
+		defaultLogPath = "domofone.log"
+		defaultPort    = 8080
+	)
+	flag.StringVar(&logPath, "logpath", defaultLogPath, "Path to write logs")
+	flag.IntVar(&port, "port", defaultPort, "Port to listen on")
+}
 
 func handle(w http.ResponseWriter, r *http.Request) {
 	bytes, _ := ioutil.ReadAll(r.Body)
@@ -27,6 +42,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	var userInfo UserInfo
 	userInfoErr := config.UnmarshalJson(
 		&userInfo, fmt.Sprintf("~/.domofoneBot/users/%v.json", userName))
+
 	if nil != userInfoErr {
 		fmt.Printf("error: %v\n", userInfoErr)
 		sendMessage(upd.Message.Chat.Id, "Not registered")
@@ -70,9 +86,19 @@ func sendMessage(chatId int, msg string) {
 }
 
 func main() {
+	setUpLogger()
+	log.Printf("Start. Listen on %v.\n", port)
 	config.UnmarshalJson(&settings, "~/.domofoneBot/settings.json")
 	http.HandleFunc("/", handle)
 	http.ListenAndServe(":8080", nil)
+}
+
+func setUpLogger() {
+	logFile, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	log.SetOutput(logFile)
 }
 
 type UserInfo struct {
